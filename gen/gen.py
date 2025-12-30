@@ -54,3 +54,21 @@ def generate_event(mode, cfg):
         }
 
     raise ValueError("Unknown mode")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", required=True, choices=["normal", "syn_flood", "port_scan"])
+    parser.add_argument("--rate", type=int, default=1)
+    parser.add_argument("--late-prob", type=float, default=0.05)
+    parser.add_argument("--max-late-ms", type=int, default=20000)
+    parser.add_argument("--target-ip", default="192.168.1.10")
+    parser.add_argument("--target-port", type=int, default=80)
+    parser.add_argument("--attacker-ip", default="10.0.0.5")
+    parser.add_argument("--scan-port", type=int, default=22)
+
+    cfg = parser.parse_args()
+
+    while True:
+        event = generate_event(cfg.mode, cfg)
+        print(json.dumps(event), flush=True)
+        time.sleep(max(0.001, 1.0 / cfg.rate))
