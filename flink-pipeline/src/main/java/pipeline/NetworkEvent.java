@@ -1,3 +1,9 @@
+/*
+ * File: NetworkEvent.java
+ * Author: Jindrich Vodak (xvodak06)
+ * Date: 31. 12. 2025
+ */
+
 package pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

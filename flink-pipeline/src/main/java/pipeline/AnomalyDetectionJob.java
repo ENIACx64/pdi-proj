@@ -1,3 +1,9 @@
+/*
+ * File: AnomalyDetectionJob.java
+ * Author: Jindrich Vodak (xvodak06)
+ * Date: 31. 12. 2025
+ */
+
 package pipeline;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
