@@ -7,12 +7,10 @@
 package pipeline;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.flink.api.common.eventtime.*;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.streaming.api.TimeCharacteristic;
-import org.apache.flink.streaming.api.datastream.*;
+import org.apache.flink.api.java.utils.ParameterTool;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
@@ -28,16 +26,34 @@ public class AnomalyDetectionJob {
 
     public static void main(String[] args) throws Exception {
 
+        // ---------------------------------------------------------
+        // Parameters (runtime configuration)
+        // ---------------------------------------------------------
+        ParameterTool params = ParameterTool.fromArgs(args);
+
+        String sourceHost = params.get("source-host", "localhost");
+        int sourcePort = params.getInt("source-port", 9999);
+
+        int windowSeconds = params.getInt("window-seconds", 10);
+        int latenessSeconds = params.getInt("lateness-seconds", 5);
+        int watermarkSeconds = params.getInt("watermark-seconds", 2);
+
+        int synThreshold = params.getInt("syn-threshold", 100);
+        int scanThreshold = params.getInt("scan-threshold", 20);
+
+        // ---------------------------------------------------------
+        // Environment
+        // ---------------------------------------------------------
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment();
 
         env.setParallelism(1);
 
-        // -------------------------
+        // ---------------------------------------------------------
         // Source: socket (Python generator)
-        // -------------------------
+        // ---------------------------------------------------------
         DataStream<String> raw =
-                env.socketTextStream("localhost", 9999);
+                env.socketTextStream(sourceHost, sourcePort);
 
         ObjectMapper mapper = new ObjectMapper();
 
@@ -45,12 +61,13 @@ public class AnomalyDetectionJob {
                 raw.map((MapFunction<String, NetworkEvent>) value ->
                         mapper.readValue(value, NetworkEvent.class));
 
-        // -------------------------
+        // ---------------------------------------------------------
         // Event time + watermarks
-        // -------------------------
+        // ---------------------------------------------------------
         WatermarkStrategy<NetworkEvent> wm =
                 WatermarkStrategy
-                        .<NetworkEvent>forBoundedOutOfOrderness(Duration.ofSeconds(2))
+                        .<NetworkEvent>forBoundedOutOfOrderness(
+                                Duration.ofSeconds(watermarkSeconds))
                         .withTimestampAssigner(
                                 (event, ts) -> event.eventTime
                         );
@@ -64,8 +81,8 @@ public class AnomalyDetectionJob {
         timed
                 .filter(e -> e.syn)
                 .keyBy(e -> e.dstIp + ":" + e.dstPort)
-                .window(TumblingEventTimeWindows.of(Time.seconds(10)))
-                .allowedLateness(Time.seconds(5))
+                .window(TumblingEventTimeWindows.of(Time.seconds(windowSeconds)))
+                .allowedLateness(Time.seconds(latenessSeconds))
                 .process(new ProcessWindowFunction<NetworkEvent, String, String, TimeWindow>() {
 
                     @Override
@@ -80,7 +97,7 @@ public class AnomalyDetectionJob {
                             count++;
                         }
 
-                        if (count >= 100) {
+                        if (count >= synThreshold) {
                             out.collect(
                                     "ALERT SYN_FLOOD target=" + key +
                                             " synCount=" + count +
@@ -99,8 +116,8 @@ public class AnomalyDetectionJob {
         timed
                 .filter(e -> e.syn)
                 .keyBy(e -> e.srcIp + "->" + e.dstIp)
-                .window(TumblingEventTimeWindows.of(Time.seconds(10)))
-                .allowedLateness(Time.seconds(5))
+                .window(TumblingEventTimeWindows.of(Time.seconds(windowSeconds)))
+                .allowedLateness(Time.seconds(latenessSeconds))
                 .process(new ProcessWindowFunction<NetworkEvent, String, String, TimeWindow>() {
 
                     @Override
@@ -115,7 +132,7 @@ public class AnomalyDetectionJob {
                             ports.add(e.dstPort);
                         }
 
-                        if (ports.size() >= 20) {
+                        if (ports.size() >= scanThreshold) {
                             out.collect(
                                     "ALERT PORT_SCAN attacker=" + key +
                                             " uniquePorts=" + ports.size() +
