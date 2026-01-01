@@ -26,9 +26,7 @@ public class AnomalyDetectionJob {
 
     public static void main(String[] args) throws Exception {
 
-        // ---------------------------------------------------------
-        // Parameters (runtime configuration)
-        // ---------------------------------------------------------
+        // Parameters
         ParameterTool params = ParameterTool.fromArgs(args);
 
         String sourceHost = params.get("source-host", "localhost");
@@ -41,17 +39,13 @@ public class AnomalyDetectionJob {
         int synThreshold = params.getInt("syn-threshold", 100);
         int scanThreshold = params.getInt("scan-threshold", 20);
 
-        // ---------------------------------------------------------
         // Environment
-        // ---------------------------------------------------------
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment();
 
         env.setParallelism(1);
 
-        // ---------------------------------------------------------
-        // Source: socket (Python generator)
-        // ---------------------------------------------------------
+        // Source: socket
         DataStream<String> raw =
                 env.socketTextStream(sourceHost, sourcePort);
 
@@ -61,9 +55,7 @@ public class AnomalyDetectionJob {
                 raw.map((MapFunction<String, NetworkEvent>) value ->
                         mapper.readValue(value, NetworkEvent.class));
 
-        // ---------------------------------------------------------
-        // Event time + watermarks
-        // ---------------------------------------------------------
+        // Watermark config
         WatermarkStrategy<NetworkEvent> wm =
                 WatermarkStrategy
                         .<NetworkEvent>forBoundedOutOfOrderness(
@@ -75,9 +67,7 @@ public class AnomalyDetectionJob {
         DataStream<NetworkEvent> timed =
                 events.assignTimestampsAndWatermarks(wm);
 
-        // =========================================================
-        // 1) SYN FLOOD DETECTION
-        // =========================================================
+        // SYN flood detection
         timed
                 .filter(e -> e.syn)
                 .keyBy(e -> e.dstIp + ":" + e.dstPort)
@@ -110,9 +100,7 @@ public class AnomalyDetectionJob {
                 })
                 .print();
 
-        // =========================================================
-        // 2) PORT SCAN DETECTION
-        // =========================================================
+        // Fast port scanning detection
         timed
                 .filter(e -> e.syn)
                 .keyBy(e -> e.srcIp + "->" + e.dstIp)
