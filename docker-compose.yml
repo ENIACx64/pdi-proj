@@ -1,0 +1,31 @@
+services:
+  generator:
+    build: ./gen
+    container_name: gen
+    ports:
+      - "9999:9999"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9999"]
+      interval: 2s
+      timeout: 1s
+      retries: 10  
+
+  flink-job:
+    image: flink:1.18.1-scala_2.12-java17
+    container_name: flink-job
+    depends_on:
+      generator:
+        condition: service_healthy
+    volumes:
+      - ./flink-pipeline/target/flink-anomaly-detection-1.0.jar:/opt/flink/usrlib/job.jar
+    command: >
+      flink run
+      --class pipeline.AnomalyDetectionJob
+      /opt/flink/usrlib/job.jar
+      --source-host generator
+      --source-port 9999
+      --window-seconds 10
+      --lateness-seconds 5
+      --syn-threshold 100
+      --scan-threshold 20
+

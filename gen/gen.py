@@ -65,9 +65,7 @@ def generate_event(mode, cfg):
     raise ValueError("Unknown mode")
 
 
-# -------------------------
-# Main
-# -------------------------
+# Main function
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -109,9 +107,7 @@ if __name__ == "__main__":
 
     cfg = parser.parse_args()
 
-    # -------------------------
     # Socket server setup
-    # -------------------------
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((cfg.host, cfg.port))

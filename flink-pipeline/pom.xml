@@ -18,7 +18,7 @@
             <version>${flink.version}</version>
         </dependency>
 
-        <!-- Flink client (REQUIRED for local execution) -->
+        <!-- Flink client  -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-clients</artifactId>
