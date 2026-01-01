@@ -2,30 +2,46 @@ services:
   generator:
     build: ./gen
     container_name: gen
+    networks:
+      - flink-net
+
+  jobmanager:
+    image: flink:1.18.1-scala_2.12-java17
+    container_name: jobmanager
+    command: jobmanager
     ports:
-      - "9999:9999"
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "9999"]
-      interval: 2s
-      timeout: 1s
-      retries: 10  
+      - "8081:8081"
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+    networks:
+      - flink-net
+
+
+  taskmanager:
+    image: flink:1.18.1-scala_2.12-java17
+    container_name: taskmanager
+    command: taskmanager
+    depends_on:
+      - jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+    networks:
+      - flink-net
+
 
   flink-job:
     image: flink:1.18.1-scala_2.12-java17
     container_name: flink-job
     depends_on:
-      generator:
-        condition: service_healthy
+      - jobmanager
+      - taskmanager
+      - generator
     volumes:
-      - ./flink-pipeline/target/flink-anomaly-detection-1.0.jar:/opt/flink/usrlib/job.jar
+      - ./flink-pipeline/target/flink-anomaly-detection-1.0.jar:/opt/flink/job.jar
     command: >
-      flink run
-      --class pipeline.AnomalyDetectionJob
-      /opt/flink/usrlib/job.jar
-      --source-host generator
-      --source-port 9999
-      --window-seconds 10
-      --lateness-seconds 5
-      --syn-threshold 100
-      --scan-threshold 20
+      flink run -m jobmanager:8081 /opt/flink/job.jar
+    networks:
+      - flink-net
 
+networks:
+  flink-net:

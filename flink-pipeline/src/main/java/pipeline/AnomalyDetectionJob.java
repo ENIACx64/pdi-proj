@@ -29,7 +29,7 @@ public class AnomalyDetectionJob {
         // Parameters
         ParameterTool params = ParameterTool.fromArgs(args);
 
-        String sourceHost = params.get("source-host", "localhost");
+        String sourceHost = params.get("source-host", "generator");
         int sourcePort = params.getInt("source-port", 9999);
 
         int windowSeconds = params.getInt("window-seconds", 10);
